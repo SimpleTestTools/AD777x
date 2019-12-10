@@ -46,5 +46,6 @@
 #define SUCCESS		0
 #define FAILURE		-1
 #define ERR_INVALID_CRC -2
+#define ERR_INVALID_GPIO -3
 
 #endif // ERROR_H_

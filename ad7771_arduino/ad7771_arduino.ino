@@ -1,3 +1,21 @@
+/*
+ * Example sketch to connect the AD7771 to Teensy 4.0
+ *
+ * Pins:
+ *
+ *  Teensy    | AD7771 Dev Kit
+ * -----------|----------------
+ *  GND       |  1 DGND
+ *   9        |  5 RESET
+ *   8        |  8 CONVST
+ *  10        | 14 ~CS
+ *  11 MOSI   | 16 SDI
+ *  12 MISO   | 17 SDO
+ *  13 SCK    | 15 SCLK
+ *  +3.3V     | 18 VIO
+ *  VIN (+5V) | 20 +12V
+ *
+ */
 #include <SPI.h>
 
 // Make the C-style headers work
@@ -11,8 +29,12 @@ ad7779_dev ad777x;
 
 void setup()
 {
-    delay(5000);
+    // Try to get serial setup early...
     Serial.begin(115200);
+    Serial.println("Hello world!");
+
+    // Wait so we have time to flush the buffer
+    delay(5000);
 
     // Enable ~CS pin
     pinMode(10, OUTPUT);
@@ -25,6 +47,7 @@ void setup()
     // C++ doesn't support dot-style struct initialization, apparently?
     init_param.spi_init.chip_select = 10;
     init_param.gpio_reset.number = 9;
+    init_param.gpio_convst_sar.number = 8;
     init_param.ctrl_mode = AD7779_SPI_CTRL;
 	init_param.spi_crc_en = AD7779_ENABLE;
     for (size_t i = 0; i < 8; i++)
@@ -71,11 +94,26 @@ void setup()
 void loop()
 {
     uint16_t sar_code = 0;
-    int32_t ret = ad7779_do_single_sar_conv(&ad777x, AD7779_AVDD1A_AVSSX_ATT, &sar_code);
-    Serial.print(ret);
-    Serial.print(" ");
+    ad7779_do_single_sar_conv(&ad777x, AD7779_DGND_AVSS1A_ATT, &sar_code);
+    Serial.print("AD7779_DGND_AVSS1A_ATT ");
     Serial.print(sar_code);
     Serial.println();
+
+    ad7779_do_single_sar_conv(&ad777x, AD7779_DGND_AVSS1B_ATT, &sar_code);
+    Serial.print("AD7779_DGND_AVSS1B_ATT ");
+    Serial.print(sar_code);
+    Serial.println();
+
+    ad7779_do_single_sar_conv(&ad777x, AD7779_DGND_AVSSX_ATT, &sar_code);
+    Serial.print("AD7779_DGND_AVSSX_ATT ");
+    Serial.print(sar_code);
+    Serial.println();
+
+    ad7779_do_single_sar_conv(&ad777x, AD7779_REF1P_REF1N, &sar_code);
+    Serial.print("AD7779_REF1P_REF1N ");
+    Serial.print(sar_code);
+    Serial.println();
+
 
     delay(2000);
 }
@@ -90,31 +128,28 @@ void mdelay(uint32_t msecs)
 
 
 /* gpio.h */
-struct gpio_desc gpio_9 = {
-    .number = 9,
-};
+struct gpio_desc gpio_8 = { .number = 8 };
+struct gpio_desc gpio_9 = { .number = 9 };
 
 int32_t gpio_get(struct gpio_desc **desc,
 		 const struct gpio_init_param *param)
 {
-    int32_t success = SUCCESS;
-
     switch (param->number)
     {
-    case 0:
-        // If we don't actually have a GPIO configured, just return success
-        *desc = NULL;
+    case 8:
+        *desc = &gpio_8;
         break;
     case 9:
         *desc = &gpio_9;
         break;
     default:
+        // If we don't actually have a GPIO configured, just return success but
+        // set the pointer to NULL.
         *desc = NULL;
-        success = FAILURE;
         break;
     }
 
-    return success;
+    return SUCCESS;
 }
 
 int32_t gpio_set_value(struct gpio_desc *desc,
@@ -122,7 +157,7 @@ int32_t gpio_set_value(struct gpio_desc *desc,
 {
     if (NULL == desc)
     {
-        return SUCCESS;
+        return ERR_INVALID_GPIO;
     }
 
     Serial.print("gpio_set_value ");
@@ -147,7 +182,6 @@ int32_t gpio_direction_output(struct gpio_desc *desc,
     }
 
     pinMode(desc->number, OUTPUT);
-
     return gpio_set_value(desc, value);
 }
 
